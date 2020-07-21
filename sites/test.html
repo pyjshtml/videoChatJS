@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>Video Chat</title>
+    <meta charset="UTF-8">
+    <meta name='viewport' content='width=device-width,initial-scale=1.0'>
+    <script src="/static/peerjs.min.js"></script>
+    <script src='/static/game.js'></script>
+    <script src="/static/scripts/bird.js" charset="utf-8"></script>
+    <script src="/static/scripts/pipe.js" charset="utf-8"></script>
+    <script src="/static/scripts/Vector.js" charset="utf-8"></script>
+    <script src="/static/scripts/game.js" charset="utf-8"></script>
+    <script type="text/javascript">
+      window.HOSTNAME = '192.168.1.12';
+      const $ = id => document.getElementById(id);
+      window.callObjs = [];
+      async function doStuff(){
+        window.localStream = await navigator.mediaDevices.getUserMedia({video:/*!isHost*/true,audio:false});
+        if(!isHost){
+          $("video").srcObject = localStream;
+          $("video").play();
+        }
+      }
+      function update(id){
+        if(typeof id == "string"){
+          let currentConn = peer.connect(id)
+          window.myConns.push(currentConn);
+        } else {
+          for(let i = 0; i < id.length; i++){
+            window.myConns.push(peer.connect(id));
+          }
+        }
+      }
+      function nload(){
+        window.isHost = location.hash == "#host";
+        doStuff().then(()=>{
+          if(!isHost){
+            connHost.send("sr");
+          }
+        })
+        if(isHost){
+          console.log("This machine is the host");
+          window.host = new Peer('hostMachine',{
+            host: window.HOSTNAME,
+            port: 9000,
+            secure: true,
+            path: '/myapp'
+          });
+          host.on('open',id=>{
+            window.idsOfPeers = [];
+            window.hConns = [];
+            host.on('connection',(hostConn)=>{
+              window.hConns.push(hostConn);
+              window.hostConn = hostConn;
+              idsOfPeers.push(hostConn.peer);
+              console.log(`${hostConn.peer} just connected to you!`);
+              hostConn.on('data',data=>{
+                if(data == 'sr'){
+                  call();
+                }
+                console.log(`Data: ${data}`);
+              });
+            });
+          })
+          window.call = function(){
+            console.log("New call")
+            window.callObjs = [];
+            for(let i = 0; i < idsOfPeers.length; i++){
+              let currCall = host.call(idsOfPeers[i],localStream);
+              window.callObjs.push(currCall);
+              currCall.on('stream',stream=>{
+                console.log("Yeah! someone answered");
+                let video = document.createElement("VIDEO");
+                video.setAttribute("class","rVideo");
+                video.title = `${currCall.peer}`;
+                video.srcObject = stream;
+                video.play();
+                console.log(video);
+                document.body.appendChild(video);
+              })
+            }
+          }
+        } else {
+          $("canvas").removeAttribute('hidden');
+          showGame();
+          window.peer = new Peer({
+            host: window.HOSTNAME,
+            port: 9000,
+            secure: true,
+            path: '/myapp'
+          });
+          peer.on('open',id=>{
+            window.connHost = peer.connect('hostMachine');
+            // connHost.on('open',()=>{
+            // });
+          });
+          peer.on('call',call=>{
+            call.answer(localStream);
+          });
+        }
+      }
+      async function showGame(){
+        init();
+      }
+    </script>
+    <style media="screen">
+      body,html{
+        margin: 0px;
+        padding: 0px;
+        width: 100vw;
+        height: 100vh;
+      }
+      video{
+        float: left;
+        height: 33vh;
+        transform: rotateY(180deg);
+      }
+      div#cont video{
+        position: absolute;
+        top: 0px;
+        right: 0px;
+      }
+    </style>
+  </head>
+  <body onload='nload()'>
+    <img src='/static/images/pipe.png' id='pipe' hidden>
+    <img src='/static/images/pipe-u.png' id='pipeu' hidden>
+    <canvas id='canvas' hidden></canvas>
+    <div id='cont' hidden>
+      <video id='video'>
+    </div>
+  </body>
+</html>

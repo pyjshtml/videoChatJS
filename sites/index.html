@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>Video Chat</title>
+    <meta charset="UTF-8">
+    <meta name='viewport' content='width=device-width,initial-scale=1.0'>
+    <script src="/static/peerjs.min.js"></script>
+    <script type="text/javascript">
+      const $ = id => document.getElementById(id);
+      function nload(){
+        makePeer();
+        if(this.location.hash == "#init"){
+          $("idP").removeAttribute('hidden');
+        } else {
+          $('idOp').removeAttribute("hidden");
+        }
+        doStuff();
+      }
+      function makePeer(){
+        window.peer = new Peer({
+          host:"192.168.1.3",
+          port: 9000,
+          secure:true,
+          path:'/myapp'
+        });
+        peer.on('open',(id)=>{
+          $("myId").innerHTML = id;
+        });
+        peer.on('connection',(conn)=>{
+          window.peerID = conn.peer;
+          alert("Someone is trying to connect to you");
+          conn.on('open',function(){
+            conn.on('data',data=>{
+              console.log(data);
+            });
+            conn.send('Hello!');
+          })
+        })
+        peer.on('call',(call)=>{
+          if(confirm("The confirmation")){
+            call.answer(window.localStream);
+            call.on('stream',(stream)=>{
+              window.pS = stream;
+              $("rVideo").srcObject = stream;
+              $("rVideo").play();
+            })
+          }
+        });
+      }
+      function playAudioStream(stream) {
+        let audio = document.createElement("AUDIO");
+        audio.setAttribute("autoplay","");
+        audio.srcObject = stream;
+        document.body.appendChild(audio);
+        // document.body.innerHTML += `<audio src="${URL.createObjectURL(stream)}"autoplay />`;
+      }
+      function connect(){
+        let pId = $("peer_id").value;
+        if(pId != ""){
+          window.conn = peer.connect(pId.toLowerCase());
+        }
+      }
+      function call(){
+        window.callObj = peer.call(peerID,window.localStream);
+        callObj.on('stream',stream=>{
+          window.pS = stream;
+          // playAudioStream(stream);
+          $("rVideo").srcObject = stream;
+          $("rVideo").play();
+        })
+      }
+      async function doStuff(){
+        console.log("Connecting to video...");
+        window.localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+        $("video").srcObject = localStream;
+        $("video").play();
+      }
+      async function battery(){
+        let batStat = await navigator.getBattery();
+        console.log(batStat.level);
+      }
+    </script>
+    <style media="screen">
+      body,html{
+        width: 100vw;
+        height: 100vh;
+        margin: 0px;
+        padding: 0px;
+      }
+      video{
+        transform: translate(-50%,-50%) rotateY(180deg);
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        height: 100%;
+      }
+      .container{
+        width: 100vw;
+        overflow: hidden;
+        height: 20vw;
+      }
+      .col{
+        width: 50vw;
+        float: left;
+        height: 100%;
+        position: relative;
+      }
+      .col:not(:first-child){
+        width: calc(50vw - 1px);
+        border-left: 1px solid #000;
+      }
+    </style>
+  </head>
+  <body onload='nload()'>
+    <div class='container'>
+      <div id='remote' class='col'>
+        <span name='remote'>remote</span>
+        <video id='rVideo' autoplay></video>
+      </div>
+      <div id='local' class='col'>
+        <span name='local'>local</span>
+        <video id='video' autoplay muted></video>
+      </div>
+    </div>
+    <p id='idP' hidden>Your Id: <span id='myId'></span></p>
+    <p id='idOp' hidden>Host Id: <input type="text" id='peer_id' onkeydown='if(event.keyCode == 13){connect()}' value=""><button onclick='connect()'>Connect</button></p>
+  </body>
+</html>

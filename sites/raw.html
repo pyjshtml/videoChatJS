@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>Video Chat</title>
+    <meta charset="UTF-8">
+    <meta name='viewport' content='width=device-width,initial-scale=1.0'>
+    <script src="/static/peerjs.min.js"></script>
+    <script type="text/javascript">
+      window.HOSTNAME = '192.168.1.12';
+      const $ = id => document.getElementById(id);
+      window.callObjs = [];
+      async function doStuff(){
+        window.localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+        $("video").srcObject = localStream;
+        $("video").play();
+      }
+      function update(id){
+        if(typeof id == "string"){
+          let currentConn = peer.connect(id)
+          window.myConns.push(currentConn);
+        } else {
+          for(let i = 0; i < id.length; i++){
+            window.myConns.push(peer.connect(id));
+          }
+        }
+      }
+      function nload(){
+        doStuff();
+        if(location.hash == "#host"){
+          console.log("This machine is the host");
+          window.host = new Peer('hostMachine',{
+            host: window.HOSTNAME,
+            port: 9000,
+            secure: true,
+            path: '/myapp'
+          });
+          host.on('open',id=>{
+            window.idsOfPeers = [];
+            window.hConns = [];
+            host.on('connection',(hostConn)=>{
+              window.hConns.push(hostConn);
+              window.hostConn = hostConn;
+              idsOfPeers.push(hostConn.peer);
+              console.log(`${hostConn.peer} just connected to you!`);
+              send();
+              hostConn.on('data',data=>{
+                switch(data){
+                  case "getIds":
+                    hostConn.send(`IDS:${idsOfPeers.slice(0,idsOfPeers.length-1).join(",")}`);
+                    break;
+                  default:
+                    console.log(`Data: ${data}`);
+                    break;
+                }
+              });
+            });
+          })
+          window.send = function(){
+            if(idsOfPeers.length >= 2){
+              for(let i = 0; i < idsOfPeers.length-1; i++){
+                hConns[i].send(idsOfPeers[idsOfPeers.length-1]);
+              }
+            }
+          }
+          window.call = function(){
+            if(confirm("Are you sure you would like to start the call?")){
+            window.callObjs = [];
+              for(let i = 0; i < idsOfPeers.length; i++){
+                let currCall = host.call(idsOfPeers[i],localStream);
+                if(i != idsOfPeers.length) hConns[i].send(`CALL:${i}`);
+                window.callObjs.push(currCall);
+                currCall.on('stream',stream=>{
+                  console.log("Yeah! someone answered");
+                  let video = document.createElement("VIDEO");
+                  video.setAttribute("class","rVideo");
+                  video.title = `${currCall.peer}`;
+                  video.srcObject = stream;
+                  video.play();
+                  document.body.appendChild(video);
+                })
+              }
+            }
+          }
+        } else {
+          window.peer = new Peer({
+            host: window.HOSTNAME,
+            port: 9000,
+            secure: true,
+            path: '/myapp'
+          });
+          function callEach(startI){
+            for(let i = startI; i < myPeerIds.length; i++){
+              let currCall = peer.call(myPeerIds[i],localStream);
+              window.callObjs.push(currCall);
+              currCall.on('stream',stream=>{
+                console.log("Yeah! someone answered");
+                let video = document.createElement("VIDEO");
+                video.setAttribute("class","rVideo");
+                video.title = `${currCall.peer}`;
+                video.srcObject = stream;
+                video.play();
+                document.body.appendChild(video);
+              })
+            }
+          }
+          peer.on('open',id=>{
+            window.myPeerIds = [];
+            window.myConns = [];
+            window.connHost = peer.connect('hostMachine');
+            connHost.on('data', async data=>{
+              if(data == "IDS:" || data == "ID:" || data == "CALL:"){
+                console.log("Empty data");
+                return;
+              }
+              if(data.indexOf("IDS:") == 0){
+                let array = data.split("IDS:")[1].split(",");
+                update(array);
+              } else if (data.indexOf("CALL:") == 0) {
+                // FIXME: MAKE SURE HOSTCONN.SEND(`CALL:${i}`) IN CALL FUNCTION!
+                callEach(parseFloat(data.split("CALL:")[1]));
+              } else if (data.indexOf("ID:")[1] == 0) {
+                console.log(`New id joined: ${data}`);
+                myPeerIds.push(data);
+                update(data);
+              } else {
+                console.log(`%c${data}`,"color:#FF00FF;font-size: 1.5em");
+              }
+            })
+            connHost.on('open',()=>{
+              console.log("Conected to host");
+              connHost.send('getIds');
+            });
+          });
+          let callNumber = 0;
+          peer.on('call',call=>{
+            call.answer(localStream);
+            console.log("I answered the call");
+            call.on('stream', function(remoteStream) {
+              console.log("I received a stream");
+              let video = document.createElement("VIDEO");
+              video.setAttribute("class","rVideo");
+              video.title = `${call.peer}`;
+              video.srcObject = remoteStream;
+              video.play();
+              console.log(video);
+              document.body.appendChild(video);
+            });
+          });
+        }
+      }
+    </script>
+    <style media="screen">
+      body,html{
+        margin: 0px;
+        padding: 0px;
+        width: 100vw;
+        height: 100vh;
+      }
+      video{
+        float: left;
+        height: 33vh;
+        transform: rotateY(180deg);
+      }
+    </style>
+  </head>
+  <body onload='nload()'>
+    <video id='video' autoplay muted></video>
+  </body>
+</html>

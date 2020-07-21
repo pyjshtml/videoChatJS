@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>Flappy Bird</title>
+    <script src="/static/scripts/pipe.js" charset="utf-8"></script>
+    <script src="/static/scripts/bird.js" charset="utf-8"></script>
+    <script src="/static/scripts/game.js" charset="utf-8"></script>
+    <script type="text/javascript">
+      const $ = id => document.getElementById(id);
+      function nload(){
+        init();
+      }
+    </script>
+  </head>
+  <body onclick='nload()'>
+    <img src='/static/images/pipe.png' id='pipe' hidden>
+    <img src='/static/images/pipe-u.png' id='pipeu' hidden>
+    <canvas id='canvas' width='600' height='600'>
+  </body>
+</html>
